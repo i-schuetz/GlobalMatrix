@@ -175,7 +175,7 @@ class ViewController: UIViewController {
         let p1x = origin.x - container.frame.origin.x
         let p1y = origin.y - container.frame.origin.y
         let originInContentViewCoords = CGPoint(x: p1x, y: p1y)
-        subviewAnchorTranslation = CGPoint(x: originInContentViewCoords.x / container.frame.width, y: originInContentViewCoords.y / container.frame.height)
+        subviewAnchorTranslation = CGPoint(x: originInContentViewCoords.x / subview.frame.width, y: originInContentViewCoords.y / subview.frame.height)
     }
     
     func containerFrame(minX: CGFloat, minY: CGFloat) -> CGRect {
