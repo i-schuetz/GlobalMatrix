@@ -30,10 +30,10 @@ let subview = UIView()
 
 let domainPoint = CGPoint(x: 5, y: 5)
 
+
+// The following variables are simplified ranges - all start with 0
 let xDomain: CGFloat = 10
 let yDomain: CGFloat = 10
-
-// Now "ranges" are derived directly from container size. For simplicity the start is included directly in toScreenPoint calculation, where it's needed.
 var xScreenRange: CGFloat {
     return container.frame.width
 }
@@ -53,7 +53,10 @@ var screenPoint: CGPoint {
     return toScreenPoint(domainPoint: domainPoint)
 }
 
-
+func toSubViewScreenPoint(domainPoint: CGPoint) -> CGPoint {
+    let globalScreenPoint = toScreenPoint(domainPoint: domainPoint)
+    return CGPoint(x: globalScreenPoint.x - container.frame.minX, y: globalScreenPoint.y - container.frame.minY)
+}
 
 class MySuperview: UIView {
     
@@ -95,7 +98,7 @@ class ViewController: UIViewController {
         container.backgroundColor = UIColor.green.withAlphaComponent(0.4)
         superview.addSubview(container)
         
-        subview.frame = CGRect(x: -container.frame.minX, y: -container.frame.minY, width: superview.bounds.width, height: superview.bounds.height)
+        subview.frame = container.bounds
         subview.backgroundColor = UIColor.blue.withAlphaComponent(0.5)
         container.addSubview(subview)
         
@@ -103,29 +106,35 @@ class ViewController: UIViewController {
         let contentLine = UIView()
         contentLine.backgroundColor = UIColor.red.withAlphaComponent(0.4)
         let contentLineWidth: CGFloat = 5
-        contentLine.frame = CGRect(x: screenPoint.x - contentLineWidth / 2, y: 0, width: contentLineWidth, height: 1000)
+        let containerScreenPoint = toSubViewScreenPoint(domainPoint: domainPoint)
+        contentLine.frame = CGRect(x: containerScreenPoint.x - contentLineWidth / 2, y: 0, width: contentLineWidth, height: 1000)
         subview.addSubview(contentLine)
         let contentLine2 = UIView()
         contentLine2.backgroundColor = UIColor.red.withAlphaComponent(0.4)
-        contentLine2.frame = CGRect(x: 0, y: screenPoint.y - contentLineWidth / 2, width: 1000, height: contentLineWidth)
+        contentLine2.frame = CGRect(x: 0, y: containerScreenPoint.y - contentLineWidth / 2, width: 1000, height: contentLineWidth)
         subview.addSubview(contentLine2)
         
-        // Set anchor point to (0, 0) to "sync" coordinate system with matrix
-        // Also, store the translation which has to preserve position while changing anchor, to use it to define subview's matrix in applyMatrixToSubview
-        subviewAnchorTranslation = subview.setAnchorWithoutTranslation(anchor: CGPoint(x: 0, y: 0))
+        // Set anchor of "subview" to top left of "parent" to be in sync when appliying matrix
+        updateSubviewAnchor()
         
-//        addGesture() // test gesture recognizer - for now not used since not even programmatic gesture works
+        
+        addGesture()
+        
+        
         
         // Frame change
         let xDelta: CGFloat = 150
+        //        let scalingFactor = (xScreenRange - xDelta) / xScreenRange
+        //        contentScalingFactor = CGPoint(x: scalingFactor, y: 1)
         changeContainerFrame(delta: CGPoint(x: xDelta, y: 0))
-        // No-op zoom, works!
+        //        print("scaling content view by: \(scalingFactor)")
+        //        subview.transform = subview.transform.scaledBy(x: contentScalingFactor!.x, y: 1)
+        
+        // No-op zoom, until here it works!
         zoom(center: screenPoint, delta: CGPoint(x: 1, y: 1))
-        
-        // BREAKS
-        zoom(center: screenPoint, delta: CGPoint(x: 1.1, y: 1))
-        
-        
+        //
+        //        // BREAKS
+        //        zoom(center: screenPoint, delta: CGPoint(x: 1.1, y: 1))
         
         
         //        zoom(center: screenPoint, delta: CGPoint(x: 1.2, y: 1.2))
@@ -160,6 +169,15 @@ class ViewController: UIViewController {
         ////        translate(delta: CGPoint(x: -240, y: -250))
     }
     
+    func updateSubviewAnchor() {
+        // Also, store the translation which has to preserve position while changing anchor, to use it to define subview's matrix in applyMatrixToSubview
+        let origin = CGPoint.zero
+        let p1x = origin.x - container.frame.origin.x
+        let p1y = origin.y - container.frame.origin.y
+        let originInContentViewCoords = CGPoint(x: p1x, y: p1y)
+        subviewAnchorTranslation = CGPoint(x: originInContentViewCoords.x / container.frame.width, y: originInContentViewCoords.y / container.frame.height)
+    }
+    
     func containerFrame(minX: CGFloat, minY: CGFloat) -> CGRect {
         let newContainerWidth = view.frame.width - minX - 20
         let newContainerHeight = view.frame.height - minY - 20
@@ -167,40 +185,26 @@ class ViewController: UIViewController {
     }
     
     func changeContainerFrame(delta: CGPoint) {
-        
-        
-        let xScalingFactor = (xScreenRange - delta.x) / xScreenRange
-        let yScalingFactor = (yScreenRange - delta.y) / yScreenRange
-        contentScalingFactor = CGPoint(x: xScalingFactor * (contentScalingFactor?.x ?? 1), y: yScalingFactor * (contentScalingFactor?.y ?? 1))
-        
-        
-        
-        
-        // experiments - try to keep the offset of subview proportional to previous one
-        let subviewOffset = CGPoint(x: 0 - subview.frame.minX, y: 0 - subview.frame.minY)
-        let scaledSubviewOffset = CGPoint(x: subviewOffset.x * xScalingFactor, y: subviewOffset.y * yScalingFactor)
-        print("subview offset: \(subviewOffset), scaledSubviewOffset: \(scaledSubviewOffset)")
+        let previousContentFrame = subview.frame
         
         container.frame = containerFrame(minX: container.frame.minX + delta.x, minY: container.frame.minY + delta.y)
+        // Change dimensions of content view by total delta of container view
+        subview.frame.size = CGSize(width: subview.frame.width - delta.x, height: subview.frame.height - delta.y)
         
-        //subview.frame = CGRect(x: subview.frame.minX - delta.x, y: subview.frame.minY - delta.y, width: subview.frame.width, height: subview.frame.height)
-        subview.frame = CGRect(x: 0 - scaledSubviewOffset.x, y: 0 - scaledSubviewOffset.y, width: subview.frame.width, height: subview.frame.height)
-        print("changed container frame, new: \(container.frame), subview frame is now: \(subview.frame)")
+        // Scale contents of content view
+        let widthChangeFactor = subview.frame.width / previousContentFrame.width
+        let heightChangeFactor = subview.frame.height / previousContentFrame.height
+        contentScalingFactor = CGPoint(x: (contentScalingFactor?.x ?? 1) * widthChangeFactor, y: (contentScalingFactor?.y ?? 1) * heightChangeFactor)
         
+        // Since resizing the container view changes its position (and thus also the position of the content view) relative to the chart view's origin, and we use the chart view's origin as anchor point, we have to update the anchor point.
+        updateSubviewAnchor()
         
-        
-
-        
-        
-        
-        superview.setNeedsDisplay()
+        let frameBeforeScale = subview.frame
         applyMatrixToSubview()
+        subview.frame = frameBeforeScale
         
         
-        
-        //        container.frame = containerFrame(minX: container.frame.minX + delta.x, minY: container.frame.minY + delta.y)
-        //        subview.frame = CGRect(x: subview.frame.minX - delta.x, y: subview.frame.minY - delta.y, width: subview.frame.width, height: subview.frame.height)
-        //        print("changed container frame, new: \(container.frame)")
+        //        superview.setNeedsDisplay()
     }
     
     func zoom(center: CGPoint, level: CGPoint) {
@@ -212,11 +216,10 @@ class ViewController: UIViewController {
         superview.setNeedsDisplay()
         applyMatrixToSubview()
         
+        // It should also work when this is enabled
         //        sometimesContainerFrameChanges()
     }
     
-    // Simulate random container size changes during zoom / pan 
-    // For now not used
     var lastSign = false
     func sometimesContainerFrameChanges() {
         if arc4random_uniform(20) == 1 {
@@ -246,6 +249,7 @@ class ViewController: UIViewController {
         superview.setNeedsDisplay()
         applyMatrixToSubview()
         
+        // It should also work when this is enabled
         //        sometimesContainerFrameChanges()
     }
     
