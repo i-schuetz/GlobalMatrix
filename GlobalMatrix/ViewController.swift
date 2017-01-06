@@ -134,7 +134,7 @@ class ViewController: UIViewController {
         zoom(center: screenPoint, delta: CGPoint(x: 1, y: 1))
         //
         //        // BREAKS
-        //        zoom(center: screenPoint, delta: CGPoint(x: 1.1, y: 1))
+                zoom(center: screenPoint, delta: CGPoint(x: 1.1, y: 1))
         
         
         //        zoom(center: screenPoint, delta: CGPoint(x: 1.2, y: 1.2))
